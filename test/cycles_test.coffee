@@ -16,7 +16,7 @@ module.exports = redeye_suite
         @cycle ?= doc.cycles[0]
       @request 'z'
     expect: ->
-      @assert.eql @cycle, ['a', 'b', 'c']
+      @assert.eql @cycle, ['a', 'b', 'c'], "incorrect cycles: #{@cycle} in uncaught cycle test"
       @finish()
   
   
@@ -35,7 +35,8 @@ module.exports = redeye_suite
     setup: ->
       @request 'z'
     expect: ->
-      @assert.eql @dispatcher.doc.cycles[0], ['a', 'b', 'c']
+      cycle = @dispatcher.doc.cycles[0]
+      @assert.eql cycle, ['a', 'b', 'c'], "incorrect cycles: #{cycle} in caught cycle test"
       @db.mget ['a', 'b', 'c'], (e, arr) =>
         @assert.eql arr, [153, 153, 153]
         @finish()
