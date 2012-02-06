@@ -1,4 +1,4 @@
-assert = require 'assert'
+consts = require './consts'
 Doctor = require './doctor'
 ControlChannel = require './control_channel'
 AuditLog = require './audit_log'
@@ -59,7 +59,7 @@ class Dispatcher
   _requested: (source, keys) ->
     if keys?.length
       @_new_request source, keys
-    else if source == '!reset'
+    else if source == consts.reset_key
       @_reset()
     else
       @_seed source
@@ -68,7 +68,7 @@ class Dispatcher
   # the seed request signals termination of the workers.
   _seed: (key) ->
     @_seed_key = key
-    @_new_request '!seed', [key]
+    @_new_request consts.seed_key, [key]
 
   # Forget everything we know about dependency state.
   _reset: ->
@@ -78,7 +78,7 @@ class Dispatcher
   # Handle a request we've never seen before from a given source
   # job that depends on the given keys.
   _new_request: (source, keys) ->
-    @_audit_log.request source, keys unless source == '!seed'
+    @_audit_log.request source, keys unless source == consts.seed_key
     @_reset_timeout()
     @_dependencies.for(source).clear_count()
     @_handle_request source, keys
@@ -110,7 +110,7 @@ class Dispatcher
   # Signal a job to run again by sending a resume message
   _reschedule: (key) ->
     @_dependencies.for(key).clear_count()
-    return @_unseed() if key == '!seed'
+    return @_unseed() if key == consts.seed_key
     return if @_dependencies.for(key).is_done()
     @_control_channel.resume key
 
