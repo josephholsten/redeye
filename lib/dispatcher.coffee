@@ -124,17 +124,14 @@ class Dispatcher
   # signalled to run again.
   _responded: (key) ->
     @_audit_log.response key
-    @_dependencies.for(key).responded()
-    @_progress @_dependencies.for(key).targets()
-
-  # Make progress on each of the given keys by decrementing
-  # their count of remaining dependencies. When any reaches
-  # zero, it is rescheduled.
-  _progress: (keys) ->
-    for key in keys
+    @_dependencies.for(key).mark_responded()
+    # Make progress on each of the given keys by decrementing
+    # their count of remaining dependencies. When any reaches
+    # zero, it is rescheduled.
+    for key in @_dependencies.for(key).targets()
       @_dependencies.for(key).progress()
-      unless @_dependencies.for(key).well_scheduled()
-        @_reschedule key
+      @_reschedule key if @_dependencies.for(key).needs_reschedule()
+
 
   # Activate a handler for idle timeouts. By default, this means
   # calling the doctor.
@@ -249,7 +246,7 @@ class DependencyRecord
   targets: ->
     @deps
 
-  responded: ->
+  mark_responded: ->
     @done()
     @clear_count()
 
