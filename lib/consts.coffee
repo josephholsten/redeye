@@ -6,3 +6,7 @@ module.exports =
   
   # Separator between multiple keys
   key_sep: '|'
+
+  seed_key: '!seed'
+
+  reset_key: '!reset'
