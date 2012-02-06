@@ -24,7 +24,6 @@ class Dispatcher
     @_requests_channel = new RequestChannel {db_index}
     @_responses_channel = new ResponseChannel {db_index}
     @_dependency_collection = new DependencyCollection()
-    @_state = {}
     @_cycles = {}
 
   # Subscribe to the `requests` and `responses` channels.
@@ -74,7 +73,6 @@ class Dispatcher
   # Forget everything we know about dependency state.
   _reset: ->
     @_dependency_collection.clear()
-    @_state = {}
     @deps = {}
     @_control_channel.reset()
 
@@ -83,7 +81,7 @@ class Dispatcher
   _new_request: (source, keys) ->
     @_audit_log.request source, keys unless source == '!seed'
     @_reset_timeout()
-    @_dependency_collection.add source
+    @_dependency_collection.delete source
     @_handle_request source, keys
 
   # Reset the timer that checks if the process is broken
@@ -98,8 +96,8 @@ class Dispatcher
       # Mark the key as a dependency of the given source job. If
       # the key is already completed, then do nothing; if it has
       # not been previously requested, create a new job for it.
-      unless @_state[key] == 'done'
-        @_request_dependency key unless @_state[key]?
+      unless @_dependency_collection.is_done key
+        @_request_dependency key unless @_dependency_collection.is_wait key
         (@deps[key] ?= []).push source
         @_dependency_collection.mark_dependency source
     unless @_dependency_collection.well_scheduled source
@@ -108,14 +106,14 @@ class Dispatcher
   # Take an unmet dependency from the latest request and push
   # it onto the `jobs` queue.
   _request_dependency: (req) ->
-    @_state[req] = 'wait'
+    @_dependency_collection.wait req
     @_control_channel.push_job req
 
   # Signal a job to run again by sending a resume message
   _reschedule: (key) ->
     @_dependency_collection.delete key
     return @_unseed() if key == '!seed'
-    return if @_state[key] == 'done'
+    return if @_dependency_collection.is_done key
     @_control_channel.resume key
 
   # The seed request was completed. In test mode, quit the workers.
@@ -128,7 +126,7 @@ class Dispatcher
   # signalled to run again.
   _responded: (key) ->
     @_audit_log.response key
-    @_state[key] = 'done'
+    @_dependency_collection.done key
     targets = @deps[key] ? []
     delete @deps[key]
     @_progress targets
@@ -153,7 +151,7 @@ class Dispatcher
   # Let the doctor figure out what's wrong here
   _call_doctor: ->
     console.log "Oops... calling the doctor!" if @_verbose
-    @doc ?= new Doctor @deps, @_state, @_seed_key
+    @doc ?= new Doctor @deps, @_dependency_collection.state(), @_seed_key
     @doc.diagnose()
     if @doc.is_stuck()
       @doc.report() if @_verbose
@@ -201,23 +199,39 @@ class DependencyCollection
     @clear()
   clear: ->
     @_members = {}
-  add: (key) ->
-    @_members[key] = new DependencyRecord()
+  for: (key) ->
+    @_members[key] ?= new DependencyRecord()
   mark_dependency: (key) ->
-    @_members[key].mark_dependency()
+    @for(key).mark_dependency()
   well_scheduled: (key) ->
-    @_members[key]?.count
+    @for(key).count
   needs_reschedule: (key) ->
     !@well_scheduled(key)
   delete: (key) ->
-    delete @_members[key]
+    @for(key).clear_count()
   progress: (key) ->
-    @_members[key].progress()
+    @for(key).progress()
   remove_dependencies: (key, deps) ->
-    @_members[key].remove_dependencies deps
+    @for(key).remove_dependencies deps
+  is_done: (key) ->
+    @for(key).is_done()
+  is_wait: (key) ->
+    @for(key).is_wait()
+  wait: (key) ->
+    @for(key).wait()
+  done: (key) ->
+    @for(key).done()
+  state: ->
+    state = {}
+    for member, record in @_members
+      state[member] = record.state unless record.is_new()
+    state
 
 class DependencyRecord
   constructor: ->
+    @count = 0
+    @state = 'new'
+  clear_count: ->
     @count = 0
   mark_dependency: ->
     @count++
@@ -225,6 +239,16 @@ class DependencyRecord
     @count--
   remove_dependencies: (deps) ->
     @count -= deps.length
+  done: ->
+    @state = 'done'
+  wait: ->
+    @state = 'wait'
+  is_done: ->
+    @state == 'done'
+  is_wait: ->
+    @state == 'wait'
+  is_new: ->
+    @state == 'new'
 
 module.exports =
 
