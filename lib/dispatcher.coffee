@@ -23,7 +23,7 @@ class Dispatcher
     @_control_channel = new ControlChannel {db_index}
     @_requests_channel = new RequestChannel {db_index}
     @_responses_channel = new ResponseChannel {db_index}
-    @_dependency_collection = new DependencyCollection()
+    @_dependencies = new DependencyCollection()
     @_cycles = {}
 
   # Subscribe to the `requests` and `responses` channels.
@@ -72,7 +72,7 @@ class Dispatcher
 
   # Forget everything we know about dependency state.
   _reset: ->
-    @_dependency_collection.clear()
+    @_dependencies.clear()
     @_control_channel.reset()
 
   # Handle a request we've never seen before from a given source
@@ -80,7 +80,7 @@ class Dispatcher
   _new_request: (source, keys) ->
     @_audit_log.request source, keys unless source == '!seed'
     @_reset_timeout()
-    @_dependency_collection.for(source).clear_count()
+    @_dependencies.for(source).clear_count()
     @_handle_request source, keys
 
   # Reset the timer that checks if the process is broken
@@ -95,23 +95,23 @@ class Dispatcher
       # Mark the key as a dependency of the given source job. If
       # the key is already completed, then do nothing; if it has
       # not been previously requested, create a new job for it.
-      unless @_dependency_collection.for(key).is_done()
-        @_request_dependency key unless @_dependency_collection.for(key).is_wait()
-        @_dependency_collection.mark_dependency source, key
-    unless @_dependency_collection.for(source).well_scheduled()
+      unless @_dependencies.for(key).is_done()
+        @_request_dependency key unless @_dependencies.for(key).is_wait()
+        @_dependencies.mark_dependency source, key
+    unless @_dependencies.for(source).well_scheduled()
       @_reschedule source
 
   # Take an unmet dependency from the latest request and push
   # it onto the `jobs` queue.
   _request_dependency: (req) ->
-    @_dependency_collection.for(req).wait()
+    @_dependencies.for(req).wait()
     @_control_channel.push_job req
 
   # Signal a job to run again by sending a resume message
   _reschedule: (key) ->
-    @_dependency_collection.for(key).clear_count()
+    @_dependencies.for(key).clear_count()
     return @_unseed() if key == '!seed'
-    return if @_dependency_collection.for(key).is_done()
+    return if @_dependencies.for(key).is_done()
     @_control_channel.resume key
 
   # The seed request was completed. In test mode, quit the workers.
@@ -124,16 +124,16 @@ class Dispatcher
   # signalled to run again.
   _responded: (key) ->
     @_audit_log.response key
-    @_dependency_collection.for(key).responded()
-    @_progress @_dependency_collection.for(key).targets()
+    @_dependencies.for(key).responded()
+    @_progress @_dependencies.for(key).targets()
 
   # Make progress on each of the given keys by decrementing
   # their count of remaining dependencies. When any reaches
   # zero, it is rescheduled.
   _progress: (keys) ->
     for key in keys
-      @_dependency_collection.for(key).progress()
-      unless @_dependency_collection.for(key).well_scheduled()
+      @_dependencies.for(key).progress()
+      unless @_dependencies.for(key).well_scheduled()
         @_reschedule key
 
   # Activate a handler for idle timeouts. By default, this means
@@ -146,8 +146,8 @@ class Dispatcher
 
   _call_doctor: ->
     console.log "Oops... calling the doctor!" if @_verbose
-    @doc ?= new Doctor @_dependency_collection.deps(), @_dependency_collection.state(), @_seed_key
-    @doc.deps = @_dependency_collection.deps()
+    @doc ?= new Doctor @_dependencies.deps(), @_dependencies.state(), @_seed_key
+    @doc.deps = @_dependencies.deps()
     @doc.diagnose()
     if @doc.is_stuck()
       @doc.report() if @_verbose
@@ -178,7 +178,7 @@ class Dispatcher
 
   # Tell the given worker that they have cycle dependencies.
   _signal_worker_of_cycles: (key, deps) ->
-    @_dependency_collection.remove_dependencies key, deps
+    @_dependencies.remove_dependencies key, deps
     @_control_channel.cycle key, deps
 
   # Print a debugging statement
