@@ -53,12 +53,8 @@ class Worker
       else
         @request_key key
     val = JSON.parse @yield()
-    kk = val + 'asdf' # XXX
-    zz = JSON.parse(val) + 1 # XXX
-    console.log 'zz:', zz # XXX
     val = @cache[key] = @build val, opts.as
     @sticky[key] = val if opts.sticky
-    console.log @key, 'got', key, 'of', val # XXX
     val
 
   # Search for the given keys in the database, then remember them.
@@ -102,7 +98,6 @@ class Worker
     @emitted = true
     key = args.join consts.arg_sep
     json = value?.toJSON?() ? value
-    console.log @key, 'emitting', key, 'of', json # XXX
     @db.set key, JSON.stringify(json)
     @db.publish @resp_channel, key
 
@@ -117,7 +112,6 @@ class Worker
     @fiber = Fiber =>
       @clear()
       @process()
-      console.log @key, 'done processing' # XXX
     @fiber.run()
 
   # Reset information about this run, including:
@@ -147,12 +141,10 @@ class Worker
   process: ->
     Worker.current = this
     result = @runner.apply(this, @args)
-    console.log 'result of', @key, 'is', result # XXX
     @finish result
   
   # We're done!
   finish: (result) ->
-    console.log @key, 'finished with', result # XXX
     Worker.finish_callback?.apply this
     num_workers--
     @queue.finish @key
