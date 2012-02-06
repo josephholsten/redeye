@@ -23,7 +23,7 @@ class Dispatcher
     @_control_channel = new ControlChannel {db_index}
     @_requests_channel = new RequestChannel {db_index}
     @_responses_channel = new ResponseChannel {db_index}
-    @_dependency_count = {}
+    @_dependency_collection = new DependencyCollection()
     @_state = {}
     @_cycles = {}
 
@@ -73,7 +73,7 @@ class Dispatcher
 
   # Forget everything we know about dependency state.
   _reset: ->
-    @_dependency_count = {}
+    @_dependency_collection.clear()
     @_state = {}
     @deps = {}
     @_control_channel.reset()
@@ -83,7 +83,7 @@ class Dispatcher
   _new_request: (source, keys) ->
     @_audit_log.request source, keys unless source == '!seed'
     @_reset_timeout()
-    @_dependency_count[source] = 0
+    @_dependency_collection.add source
     @_handle_request source, keys
 
   # Reset the timer that checks if the process is broken
@@ -101,8 +101,8 @@ class Dispatcher
       unless @_state[key] == 'done'
         @_request_dependency key unless @_state[key]?
         (@deps[key] ?= []).push source
-        @_dependency_count[source]++
-    unless @_dependency_count[source]
+        @_dependency_collection.mark_dependency source
+    unless @_dependency_collection.well_scheduled source
       @_reschedule source
 
   # Take an unmet dependency from the latest request and push
@@ -113,7 +113,7 @@ class Dispatcher
 
   # Signal a job to run again by sending a resume message
   _reschedule: (key) ->
-    delete @_dependency_count[key]
+    @_dependency_collection.delete key
     return @_unseed() if key == '!seed'
     return if @_state[key] == 'done'
     @_control_channel.resume key
@@ -138,7 +138,8 @@ class Dispatcher
   # zero, it is rescheduled.
   _progress: (keys) ->
     for key in keys
-      unless --@_dependency_count[key]
+      @_dependency_collection.progress key
+      unless @_dependency_collection.well_scheduled key
         @_reschedule key
 
   # Activate a handler for idle timeouts. By default, this means
@@ -188,12 +189,42 @@ class Dispatcher
 
   # Remove given dependencies from the key
   _remove_dependencies: (key, deps) ->
-    @_dependency_count[key] -= deps.length
+    @_dependency_collection.remove_dependencies key, deps
     @deps[dep] = _.without @deps[dep], key for dep in deps
 
   # Print a debugging statement
   _debug: (args...) ->
     #console.log 'dispatcher:', args...
+
+class DependencyCollection
+  constructor: ->
+    @clear()
+  clear: ->
+    @_members = {}
+  add: (key) ->
+    @_members[key] = new DependencyRecord()
+  mark_dependency: (key) ->
+    @_members[key].mark_dependency()
+  well_scheduled: (key) ->
+    @_members[key]?.count
+  needs_reschedule: (key) ->
+    !@well_scheduled(key)
+  delete: (key) ->
+    delete @_members[key]
+  progress: (key) ->
+    @_members[key].progress()
+  remove_dependencies: (key, deps) ->
+    @_members[key].remove_dependencies deps
+
+class DependencyRecord
+  constructor: ->
+    @count = 0
+  mark_dependency: ->
+    @count++
+  progress: ->
+    @count--
+  remove_dependencies: (deps) ->
+    @count -= deps.length
 
 module.exports =
 
