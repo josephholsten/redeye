@@ -4,6 +4,7 @@ ControlChannel = require './control_channel'
 AuditLog = require './audit_log'
 RequestChannel = require './request_channel'
 ResponseChannel = require './response_channel'
+DependencyCollection = require './dependency_collection'
 _ = require 'underscore'
 require './util'
 
@@ -56,69 +57,69 @@ class Dispatcher
   # recorded as dependencies, and any new key requests are
   # turned into new jobs. You can request the key `!reset` in
   # order to flush the dependency graph.
-  _requested: (source, keys) ->
-    if keys?.length
-      @_audit_log.request source, keys
-      @_new_request source, keys
-    else if source == consts.reset_key
+  _requested: (source_key, target_keys) ->
+    if target_keys?.length
+      @_audit_log.request source_key, target_keys
+      @_new_request source_key, target_keys
+    else if source_key == consts.reset_key
       # Forget everything we know about dependency state.
       @_dependencies.clear()
       @_control_channel.reset()
     else
       # The given key is a 'seed' request. In test mode, completion of
       # the seed request signals termination of the workers.
-      @_seed_key = source
-      @_new_request consts.seed_key, [source]
+      @_seed_key = source_key
+      @_new_request consts.seed_key, [source_key]
 
   # Handle a request we've never seen before from a given source
   # job that depends on the given keys.
-  _new_request: (source, keys) ->
+  _new_request: (source_key, target_keys) ->
     # Reset the timer that checks if the process is broken
     @_clear_timeout()
     @_timeout = setTimeout (=> @_idle()), @_idle_timeout
-    dependency = @_dependencies.for(source)
-    dependency.clear_count()
+    source = @_dependencies.for source_key
+    source.clear_targets()
     # Handle the requested keys by marking them as dependencies
     # and turning any unsatisfied ones into new jobs.
-    for key in _.uniq keys
+    for target_key in _.uniq target_keys
+      target = @_dependencies.for target_key
+      source.add_target target
+      target.add_source source
       # Mark the key as a dependency of the given source job. If
       # the key is already completed, then do nothing; if it has
       # not been previously requested, create a new job for it.
-      unless @_dependencies.for(key).is_done()
-        unless @_dependencies.for(key).is_wait()
-          # Take an unmet dependency from the latest request and push
-          # it onto the `jobs` queue.
-          @_dependencies.for(key).wait()
-          @_control_channel.push_job key
-        @_dependencies.mark_dependency source, key
-    @_reschedule dependency if dependency.needs_reschedule()
+      if target.is_new()
+        # Take an unmet dependency from the latest request and push
+        # it onto the `jobs` queue.
+        target.wait()
+        @_control_channel.push_job target.key
+    @_reschedule source
 
-  # Signal a job to run again by sending a resume message
-  _reschedule: (dependency) ->
-    dependency.clear_count()
-    return @_unseed() if dependency.is_seed_key()
-    return if dependency.is_done()
-    @_control_channel.resume dependency.key
-
-  # The seed request was completed. In test mode, quit the workers.
-  _unseed: ->
-    @_clear_timeout()
-    @quit() if @_test_mode
+  # Signal a job to run again by sending a resume message.
+  _reschedule: (source) ->
+    if source.has_no_targets()
+      if source.is_seed_key()
+        # The seed request was completed. In test mode, quit the workers.
+        @_clear_timeout()
+        @quit() if @_test_mode
+      else
+        @_control_channel.resume source.key unless source.is_done()
 
   # Called when a key is completed. Any jobs depending on this
   # key are updated, and if they have no more dependencies, are
   # signalled to run again.
-  _responded: (key) ->
-    @_audit_log.response key
-    @_dependencies.for(key).mark_responded()
+  _responded: (target_key) ->
+    target = @_dependencies.for target_key
+    @_audit_log.response target.key
+    target.done()
+    target.clear_targets()
     # Make progress on each of the given keys by decrementing
     # their count of remaining dependencies. When any reaches
     # zero, it is rescheduled.
-    for key in @_dependencies.for(key).targets()
-      dependency = @_dependencies.for(key)
-      dependency.progress()
-      @_reschedule dependency if dependency.needs_reschedule()
-
+    for source_key in target.sources()
+      source = @_dependencies.for source_key
+      source.remove_target target
+      @_reschedule source
 
   # Activate a handler for idle timeouts. By default, this means
   # calling the doctor.
@@ -131,7 +132,7 @@ class Dispatcher
   # Let the doctor figure out what's wrong here
   _call_doctor: ->
     console.log "Oops... calling the doctor!" if @_verbose
-    @doc ?= new Doctor @_dependencies.deps(), @_dependencies.state(), @_seed_key
+    @doc ?= new Doctor @_dependencies.sources(), @_dependencies.states(), @_seed_key
     @doc.diagnose()
     if @doc.is_stuck()
       @doc.report() if @_verbose
@@ -161,84 +162,14 @@ class Dispatcher
     @_stuck_callback?(@doc, @_control_channel.db())
 
   # Tell the given worker that they have cycle dependencies.
-  _signal_worker_of_cycles: (key, deps) ->
-    @_dependencies.remove_dependencies key, deps
-    @_control_channel.cycle key, deps
+  _signal_worker_of_cycles: (source, targets) ->
+    @_dependencies.for(source).remove_targets targets
+    @_dependencies.for(target).remove_source source for target in targets
+    @_control_channel.cycle source, targets
 
   # Print a debugging statement
   _debug: (args...) ->
     #console.log 'dispatcher:', args...
-
-class DependencyCollection
-  constructor: ->
-    @clear()
-  clear: ->
-    @_members = {}
-  for: (key) ->
-    @_members[key] ?= new DependencyRecord(key)
-  mark_dependency: (source, key) ->
-    @for(source).mark_dependency()
-    @for(key).push_dep source
-  remove_dependencies: (key, deps) ->
-    @for(key).remove_dependencies deps
-    @for(dep).remove_dep key for dep in deps
-  state: ->
-    state = {}
-    for member, record of @_members
-      state[member] = record.state unless record.is_new()
-    state
-
-  deps: ->
-    deps = {}
-    for key, record of @_members
-      deps[key] = record.deps if record.has_deps()
-    deps
-
-class DependencyRecord
-  constructor: (@key) ->
-    @count = 0
-    @state = 'new'
-    @deps = []
-  clear_count: ->
-    @count = 0
-  mark_dependency: ->
-    @count++
-  progress: ->
-    @count--
-  remove_dependencies: (deps) ->
-    @count -= deps.length
-  done: ->
-    @state = 'done'
-  wait: ->
-    @state = 'wait'
-  is_done: ->
-    @state == 'done'
-  is_wait: ->
-    @state == 'wait'
-  is_new: ->
-    @state == 'new'
-  well_scheduled: ->
-    @count
-  needs_reschedule: ->
-    !@well_scheduled()
-
-  push_dep: (source) ->
-    @deps.push source
-  clear_deps: ->
-    @deps = []
-  has_deps: ->
-    @deps.length != 0
-  remove_dep: (key) ->
-    @deps = _.without @deps, key
-  targets: ->
-    @deps
-
-  mark_responded: ->
-    @done()
-    @clear_count()
-
-  is_seed_key: ->
-    @key == consts.seed_key
 
 module.exports =
 
