@@ -1,4 +1,8 @@
 Worker = require './worker'
+ControlFanout = require './control_fanout'
+RequestFanout = require './request_fanout'
+ResponseFanout = require './response_fanout'
+JobQueue = require './job_queue'
 events = require 'events'
 consts = require './consts'
 db = require './db'
@@ -11,12 +15,14 @@ class WorkQueue extends events.EventEmitter
 
   # Register the 'next' event, and listen for 'resume' messages.
   constructor: (@options) ->
-    @worker_db = db @options.db_index
+    {db_index} = @options
+    @worker_db = db db_index
+    @worker_request_fanout = new RequestFanout {db_index}
+    @worker_response_fanout = new ResponseFanout {db_index}
     @runners = {}
     @mixins = {}
-    @_db = db @options.db_index
-    @_control = db @options.db_index
-    @_control_channel = _('control').namespace(@options.db_index)
+    @_job_queue = new JobQueue {db_index}
+    @_control_fanout = new ControlFanout {db_index}
     @_workers = {}
     @_sticky = {}
     @_listen()
@@ -52,8 +58,7 @@ class WorkQueue extends events.EventEmitter
 
   # Subscribe to channels
   _listen: ->
-    @_control.on 'message', (channel, msg) => @_perform msg
-    @_control.subscribe @_control_channel
+    @_control_fanout.listen (msg) => @_perform msg
 
   # React to a control message sent by the dispatcher
   _perform: (msg) ->
@@ -82,7 +87,7 @@ class WorkQueue extends events.EventEmitter
   # 
   # You can push the job `!quit` to make the work queue die.
   _next: ->
-    @_db.blpop 'jobs', 0, (err, [key, str]) =>
+    @_job_queue.pop_job (err, [key, str]) =>
       if err
         @emit 'next'
         return @_error err
@@ -95,9 +100,11 @@ class WorkQueue extends events.EventEmitter
 
   # Shut down the redis connection and stop running workers
   _quit: ->
-    @_db.end()
-    @_control.end()
+    @_job_queue.end()
+    @_control_fanout.end()
     @worker_db.end()
+    @worker_request_fanout.end()
+    @worker_response_fanout.end()
     @callback?()
 
   # Clean out the sticky cache
@@ -109,7 +116,7 @@ class WorkQueue extends events.EventEmitter
   _error: (err) ->
     message = err.stack ? err
     console.log message
-    @_db.set 'fatal', message
+    @_job_queue.fatal message
 
   # Print a debugging statement
   _debug: (args...) ->

@@ -18,8 +18,9 @@ class Worker
     [@prefix, args...] = @key.split consts.arg_sep
     @args = args # weird bug in coffeescript: wanted @args... in line above
     @db = @queue.worker_db
-    @req_channel = _('requests').namespace @queue.options.db_index
-    @resp_channel = _('responses').namespace @queue.options.db_index
+    {db_index} = @queue.options
+    @_request_fanout = @queue.worker_request_fanout
+    @_response_fanout = @queue.worker_response_fanout
     @cache = {}
     @saved_keys = {}
     @cycle = {}
@@ -127,7 +128,7 @@ class Worker
     @emitted_key[key] = true
     json = value?.toJSON?() ? value
     @db.set key, JSON.stringify(json)
-    @db.publish @resp_channel, key
+    @_response_fanout.publish key
 
   # If we've seen this `@for_reals` before, then blow right past it.
   # Otherwise, abort the runner function and start over (after checking
@@ -236,13 +237,12 @@ class Worker
       else
         @run()
 
-  # Ask the dispatcher to providethe given keys by publishing on the
+  # Ask the dispatcher to provide the given keys by publishing on the
   # `requests` channel. Then block-wait to be signalled by a response
   # on a resume key. Once we get that response, try again to fetch the
   # dependencies (which should all be present).
   request_missing: (keys) ->
-    request = [@key, keys...].join consts.key_sep
-    @db.publish @req_channel, request
+    @_request_fanout.request_missing @key, keys
 
   # The dispatcher said to resume, so go look for the missing values again. If
   # we're resuming from a cycle failure, go grab the key.

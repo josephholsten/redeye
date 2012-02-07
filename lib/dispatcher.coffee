@@ -1,9 +1,10 @@
 consts = require './consts'
 Doctor = require './doctor'
-ControlChannel = require './control_channel'
 AuditLog = require './audit_log'
-RequestChannel = require './request_channel'
-ResponseChannel = require './response_channel'
+ControlFanout = require './control_fanout'
+RequestFanout = require './request_fanout'
+ResponseFanout = require './response_fanout'
+JobQueue = require './job_queue'
 DependencyCollection = require './dependency_collection'
 _ = require 'underscore'
 require './util'
@@ -21,26 +22,28 @@ class Dispatcher
     @_idle_timeout = options.idle_timeout ? (if @_test_mode then 500 else 10000)
     @_audit_log = new AuditLog stream: options.audit
     {db_index} = options
-    @_control_channel = new ControlChannel {db_index}
-    @_requests_channel = new RequestChannel {db_index}
-    @_responses_channel = new ResponseChannel {db_index}
+    @_control_fanout = new ControlFanout {db_index}
+    @_request_fanout = new RequestFanout {db_index}
+    @_response_fanout = new ResponseFanout {db_index}
+    @_job_queue = new JobQueue {db_index}
     @_dependencies = new DependencyCollection()
     @_cycles = {}
 
   # Subscribe to the `requests` and `responses` channels.
   listen: ->
-    @_requests_channel.listen (source, keys) => @_requested source, keys
-    @_responses_channel.listen (ch, str) => @_responded str
+    @_request_fanout.listen (source, keys) => @_requested source, keys
+    @_response_fanout.listen (ch, str) => @_responded str
 
   # Send quit signals to the work queues.
   quit: ->
     @_clear_timeout()
-    @_control_channel.quit()
+    @_control_fanout.quit()
     finish = =>
-      @_control_channel.delete_jobs()
-      @_requests_channel.end()
-      @_responses_channel.end()
-      @_control_channel.end()
+      @_job_queue.delete_jobs()
+      @_request_fanout.end()
+      @_response_fanout.end()
+      @_control_fanout.end()
+      @_job_queue.end()
     setTimeout finish, 500
 
   # Provide a callback to be called when the dispatcher detects the process is stuck
@@ -64,7 +67,7 @@ class Dispatcher
     else if source_key == consts.reset_key
       # Forget everything we know about dependency state.
       @_dependencies.clear()
-      @_control_channel.reset()
+      @_control_fanout.reset()
     else
       # The given key is a 'seed' request. In test mode, completion of
       # the seed request signals termination of the workers.
@@ -92,7 +95,7 @@ class Dispatcher
         # Take an unmet dependency from the latest request and push
         # it onto the `jobs` queue.
         target.wait()
-        @_control_channel.push_job target.key
+        @_job_queue.push_job target.key
     @_reschedule source
 
   # Signal a job to run again by sending a resume message.
@@ -103,7 +106,7 @@ class Dispatcher
         @_clear_timeout()
         @quit() if @_test_mode
       else
-        @_control_channel.resume source.key unless source.is_done()
+        @_control_fanout.resume source.key unless source.is_done()
 
   # Called when a key is completed. Any jobs depending on this
   # key are updated, and if they have no more dependencies, are
@@ -159,13 +162,13 @@ class Dispatcher
 
   # Recovery failed, let the callback know about it.
   _fail_recovery: ->
-    @_stuck_callback?(@doc, @_control_channel.db())
+    @_stuck_callback?(@doc, @_control_fanout.db())
 
   # Tell the given worker that they have cycle dependencies.
   _signal_worker_of_cycles: (source, targets) ->
     @_dependencies.for(source).remove_targets targets
     @_dependencies.for(target).remove_source source for target in targets
-    @_control_channel.cycle source, targets
+    @_control_fanout.cycle source, targets
 
   # Print a debugging statement
   _debug: (args...) ->
