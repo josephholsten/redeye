@@ -152,6 +152,7 @@ class Dispatcher
   _call_doctor: ->
     console.log "Oops... calling the doctor!" if @_verbose
     @doc ?= new Doctor @deps, @_dependency_collection.state(), @_seed_key
+    @doc.deps = @deps
     @doc.diagnose()
     if @doc.is_stuck()
       @doc.report() if @_verbose
