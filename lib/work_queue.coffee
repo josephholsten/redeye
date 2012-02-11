@@ -1,13 +1,11 @@
 Worker = require './worker'
+Dictionary = require './dictionary'
 ControlFanout = require './control_fanout'
 RequestFanout = require './request_fanout'
 ResponseFanout = require './response_fanout'
 JobQueue = require './job_queue'
 events = require 'events'
 consts = require './consts'
-db = require './db'
-_ = require 'underscore'
-require './util'
 
 # The `WorkQueue` accepts job requests and starts `Worker` objects
 # to handle them.
@@ -16,7 +14,7 @@ class WorkQueue extends events.EventEmitter
   # Register the 'next' event, and listen for 'resume' messages.
   constructor: (@options) ->
     {db_index} = @options
-    @worker_db = db db_index
+    @worker_dict = new Dictionary {db_index}
     @worker_request_fanout = new RequestFanout {db_index}
     @worker_response_fanout = new ResponseFanout {db_index}
     @runners = {}
@@ -102,7 +100,7 @@ class WorkQueue extends events.EventEmitter
   _quit: ->
     @_job_queue.end()
     @_control_fanout.end()
-    @worker_db.end()
+    @worker_dict.end()
     @worker_request_fanout.end()
     @worker_response_fanout.end()
     @callback?()

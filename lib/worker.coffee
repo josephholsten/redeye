@@ -1,5 +1,4 @@
 consts = require './consts'
-db = require './db'
 _ = require 'underscore'
 require './util'
 
@@ -17,8 +16,8 @@ class Worker
   constructor: (@key, @queue, @sticky) ->
     [@prefix, args...] = @key.split consts.arg_sep
     @args = args # weird bug in coffeescript: wanted @args... in line above
-    @db = @queue.worker_db
-    {db_index} = @queue.options
+    @dict = @queue.worker_dict
+    @db = @dict.db()
     @_request_fanout = @queue.worker_request_fanout
     @_response_fanout = @queue.worker_response_fanout
     @cache = {}
@@ -127,7 +126,7 @@ class Worker
     return if @emitted_key[key]
     @emitted_key[key] = true
     json = value?.toJSON?() ? value
-    @db.set key, JSON.stringify(json)
+    @dict.set key, JSON.stringify(json)
     @_response_fanout.publish key
 
   # If we've seen this `@for_reals` before, then blow right past it.
@@ -184,7 +183,7 @@ class Worker
   error: (err) ->
     message = err.stack ? err
     console.log message
-    @db.set 'fatal', message
+    @dict.set 'fatal', message
 
   # Call the runner. If it gets all the way through, first check if there
   # were any unmet dependencies after the last `@for_reals`. If so, we force
@@ -217,7 +216,7 @@ class Worker
   # the dependencies.
   resolve: ->
     if @search
-      @db.keys @search, (e, keys) =>
+      @dict.keys @search, (e, keys) =>
         @saved_keys[@search] = keys
         @run()
     else
@@ -229,7 +228,7 @@ class Worker
   # main function.
   get_deps: (force = false) ->
     throw "No dependencies to get: #{@key}" unless @deps.length
-    @db.mget @deps, (err, arr) =>
+    @dict.mget @deps, (err, arr) =>
       return @error err if err
       bad = @check_values arr
       if bad.length && !force
