@@ -1,4 +1,4 @@
-RedisFanout = require './redis_fanout'
+Fanout = require './fanout'
 
-module.exports = class ResponseFanout extends RedisFanout
+module.exports = class ResponseFanout extends Fanout
   _fanout_name: -> 'responses'

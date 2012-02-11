@@ -32,7 +32,7 @@ class Dispatcher
   # Subscribe to the `requests` and `responses` channels.
   listen: ->
     @_request_fanout.listen (source, keys) => @_requested source, keys
-    @_response_fanout.listen (ch, str) => @_responded str
+    @_response_fanout.listen (str) => @_responded str
 
   # Send quit signals to the work queues.
   quit: ->

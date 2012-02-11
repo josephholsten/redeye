@@ -1,15 +1,11 @@
-RedisFanout = require './redis_fanout'
+Fanout = require './fanout'
 consts = require './consts'
 db = require './db'
 _ = require 'underscore'
 require './util'
 
-module.exports = class ControlFanout extends RedisFanout
+module.exports = class ControlFanout extends Fanout
   _fanout_name: -> 'control'
-
-  listen: (callback) ->
-    super (ch, str) ->
-      callback str
 
   cycle: (key, deps) ->
     msg = ['cycle', key, deps...].join consts.key_sep

@@ -12,7 +12,8 @@ module.exports = class RedisFanout
   publish: (msg) -> @_db.publish @_channel, msg
 
   listen: (callback) ->
-    @_db.on 'message', callback
+    @_db.on 'message', (ch, msg) ->
+      callback msg
     @_db.subscribe @_channel
 
   end: -> @_db.end()

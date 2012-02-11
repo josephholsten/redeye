@@ -1,14 +1,14 @@
-RedisFanout = require './redis_fanout'
+Fanout = require './fanout'
 consts = require './consts'
 db = require './db'
 _ = require 'underscore'
 require './util'
 
-module.exports = class RequestFanout extends RedisFanout
+module.exports = class RequestFanout extends Fanout
   _fanout_name: -> 'requests'
 
   listen: (callback) ->
-    super (ch, str) ->
+    super (str) ->
       [source, keys...] = str.split consts.key_sep
       callback source, keys
 
