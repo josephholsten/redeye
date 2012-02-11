@@ -1,7 +1,7 @@
-consts = require './consts'
-db = require './db'
+consts = require '../consts'
+db = require '../db'
 _ = require 'underscore'
-require './util'
+require '../util'
 
 module.exports = class RedisQueue
   constructor: (options) ->
@@ -19,3 +19,4 @@ module.exports = class RedisQueue
   db: -> @_db
 
   _queue_name: -> ''
+

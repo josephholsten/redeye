@@ -1,6 +1,6 @@
-RedisQueue = require './redis_queue'
+Queue = require './queue'
 
-module.exports = class JobQueue extends RedisQueue
+module.exports = class JobQueue extends Queue
   _queue_name: -> 'jobs'
   push_job: (req) -> @rpush req
   pop_job: (callback) -> @blpop callback
