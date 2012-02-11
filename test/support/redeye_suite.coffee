@@ -35,8 +35,12 @@ AuditListener = require './audit_listener'
 db = require '../../lib/db'
 _ = require 'underscore'
 require '../../lib/util'
+winston = require 'winston'
 
 db_index = 4
+
+winston.setLevels winston.config.syslog.levels
+winston.loggers.default.transports[0].level = 'info'
 
 # Test class for replacing a single expresso test.
 class RedeyeTest
