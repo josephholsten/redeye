@@ -115,6 +115,7 @@ class WorkQueue extends events.EventEmitter
     message = err.stack ? err
     console.log message
     @_job_queue.fatal message
+    @worker_dict.set 'fatal', message
 
   # Print a debugging statement
   _debug: (args...) ->
