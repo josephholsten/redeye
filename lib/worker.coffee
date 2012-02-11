@@ -1,6 +1,7 @@
 consts = require './consts'
 _ = require 'underscore'
 require './util'
+winston = require 'winston'
 
 # Counts the number of simultaneous workers.
 num_workers = 0
@@ -28,7 +29,7 @@ class Worker
     @last_stage = 0
     unless @runner = @queue.runners[@prefix]
       @emit @key, null
-      console.log "no runner for '#{@prefix}' (#{@key})"
+      winston.info "no runner for '#{@prefix}' (#{@key})"
       throw 'no_runner'
     num_workers++
   
@@ -40,7 +41,7 @@ class Worker
   
   # Print a debugging statement
   debug: (args...) ->
-    #console.log 'worker:', args...
+    winston.debug 'worker:', args...
 
   # If we've already seen this `@get` before, then return the actual
   # value we've received (which we know we got because otherwise we
@@ -182,7 +183,7 @@ class Worker
   # Mark that a fatal exception occurred
   error: (err) ->
     message = err.stack ? err
-    console.log message
+    winston.error message
     @dict.set 'fatal', message
 
   # Call the runner. If it gets all the way through, first check if there

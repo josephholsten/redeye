@@ -6,6 +6,7 @@ ResponseFanout = require './response_fanout'
 JobQueue = require './job_queue'
 events = require 'events'
 consts = require './consts'
+winston = require 'winston'
 
 # The `WorkQueue` accepts job requests and starts `Worker` objects
 # to handle them.
@@ -107,18 +108,18 @@ class WorkQueue extends events.EventEmitter
 
   # Clean out the sticky cache
   _reset: ->
-    console.log 'worker resetting'
+    winston.info 'worker resetting'
     @_sticky = {}
 
   # Mark that a fatal exception occurred
   _error: (err) ->
     message = err.stack ? err
-    console.log message
+    winston.error message
     @_job_queue.fatal message
     @worker_dict.set 'fatal', message
 
   # Print a debugging statement
   _debug: (args...) ->
-    #console.log 'queue:', args...
+    winston.debug 'queue:', args...
 
 module.exports = WorkQueue

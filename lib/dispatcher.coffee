@@ -8,6 +8,7 @@ JobQueue = require './job_queue'
 DependencyCollection = require './dependency_collection'
 _ = require 'underscore'
 require './util'
+winston = require 'winston'
 
 # The dispatcher accepts requests for keys and manages the
 # dependencies between jobs. It ensures that the same work
@@ -18,7 +19,6 @@ class Dispatcher
   # Initializer
   constructor: (options) ->
     @_test_mode = options.test_mode
-    @_verbose = options.verbose
     @_idle_timeout = options.idle_timeout ? (if @_test_mode then 500 else 10000)
     @_audit_log = new AuditLog stream: options.audit
     {db_index} = options
@@ -133,15 +133,15 @@ class Dispatcher
       @_call_doctor()
 
   _call_doctor: ->
-    console.log "Oops... calling the doctor!" if @_verbose
+    winston.info "Oops... calling the doctor!"
     @doc ?= new Doctor @_dependencies.sources(), @_dependencies.states(), @_seed_key
     @doc.deps = @_dependencies.sources()
     @doc.diagnose()
     if @doc.is_stuck()
-      @doc.report() if @_verbose
+      @doc.report()
       @_recover()
     else
-      console.log "Hmm, the doctor couldn't find anything amiss..." if @_verbose
+      winston.info "Hmm, the doctor couldn't find anything amiss..."
 
   # Recover from a stuck process.
   _recover: ->
@@ -172,7 +172,7 @@ class Dispatcher
 
   # Print a debugging statement
   _debug: (args...) ->
-    #console.log 'dispatcher:', args...
+    winston.debug 'dispatcher:', args...
 
 module.exports =
 

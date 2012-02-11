@@ -1,4 +1,5 @@
 consts = require './consts'
+winston = require 'winston'
 
 module.exports = class AuditLog
   constructor: (options) ->
@@ -6,7 +7,7 @@ module.exports = class AuditLog
 
   # Write text to the audit stream
   log: (text) ->
-    #console.log text
+    winston.info "Audit", text
     @_stream.write "#{text}\n" if @_stream
 
   request: (source, keys) ->

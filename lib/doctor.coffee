@@ -1,4 +1,5 @@
 _ = require 'underscore'
+winston = require 'winston'
 
 # The Doctor scans the dependencies and state of requests to determine
 # why no progress is being made. It looks for cyclic dependencies and
@@ -27,12 +28,12 @@ class Doctor
   # Print out the dependencies
   report_deps: ->
     for key, values of @inv
-      console.log "#{key} -> #{values.join ', '}"
+      winston.info "#{key} -> #{values.join ', '}"
   
   # Report on the state of affairs
   report_state: ->
     for key, state of @state
-      console.log "#{key} :: #{state}"
+      winston.info "#{key} :: #{state}"
   
   # Print out a list of cyclic dependencies. For instance,
   # 
@@ -41,17 +42,17 @@ class Doctor
   # means that C cycles back around to A.
   report_cycles: ->
     return unless @cycles.count
-    console.log "Cycles:"
+    winston.info "Cycles:"
     for cycle in @cycles
-      console.log "  #{cycle.join ' -> '}"
+      winston.info "  #{cycle.join ' -> '}"
   
   # Report on loose ends, that is, unsatisfied dependencies that
   # aren't part of cycles.
   report_loose_ends: ->
     return unless @has_loose_ends
-    console.log "Loose ends:"
+    winston.info "Loose ends:"
     for node, stack of @loose_ends
-      console.log "  #{node}: #{stack.join ','}"
+      winston.info "  #{node}: #{stack.join ','}"
   
   # Remove versions of cycles that are duplicates
   uniqify_cycles: ->
