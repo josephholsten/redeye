@@ -30,6 +30,7 @@
 dispatcher = require '../../lib/dispatcher'
 redeye = require '../../lib/redeye'
 consts = require '../../lib/consts'
+RequestFanout = require '../../lib/request_fanout'
 AuditListener = require './audit_listener'
 db = require '../../lib/db'
 _ = require 'underscore'
@@ -47,6 +48,7 @@ class RedeyeTest
     @db_index = ++db_index
     @db = db @db_index
     @audit = new AuditListener
+    @_request_fanout = new RequestFanout db_index: @db_index
     @opts = test_mode: true, db_index: @db_index, audit: @audit
     @queue = redeye.queue @opts
     @add_workers()
@@ -83,11 +85,12 @@ class RedeyeTest
   finish: ->
     clearTimeout @timeout
     @db.end()
+    @_request_fanout.end()
   
   # Send a request to the correct `requests` channel
   request: (args...) ->
     @requested = args.join consts.arg_sep
-    @db.publish _('requests').namespace(@db_index), @requested
+    @_request_fanout.publish @requested
   
   # Set a redis value, but first convert to JSON
   set: (args..., value) ->
