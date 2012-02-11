@@ -85,7 +85,7 @@ class WorkQueue extends events.EventEmitter
   # 
   # You can push the job `!quit` to make the work queue die.
   _next: ->
-    @_job_queue.pop_job (err, [key, str]) =>
+    @_job_queue.pop (err, [key, str]) =>
       if err
         @emit 'next'
         return @_error err

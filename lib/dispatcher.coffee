@@ -39,7 +39,7 @@ class Dispatcher
     @_clear_timeout()
     @_control_fanout.quit()
     finish = =>
-      @_job_queue.delete_jobs()
+      @_job_queue.clear()
       @_request_fanout.end()
       @_response_fanout.end()
       @_control_fanout.end()
@@ -95,7 +95,7 @@ class Dispatcher
         # Take an unmet dependency from the latest request and push
         # it onto the `jobs` queue.
         target.wait()
-        @_job_queue.push_job target.key
+        @_job_queue.push target.key
     @_reschedule source
 
   # Signal a job to run again by sending a resume message.

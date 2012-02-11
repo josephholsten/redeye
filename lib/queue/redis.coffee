@@ -8,11 +8,11 @@ module.exports = class RedisQueue
     {db_index} = options
     @_db = db db_index
 
-  del: -> @_db.del @_queue_name()
+  clear: -> @_db.del @_queue_name()
 
-  rpush: (msg) -> @_db.rpush @_queue_name(), msg
+  push: (msg) -> @_db.rpush @_queue_name(), msg
 
-  blpop: (callback) -> @_db.blpop @_queue_name(), 0, callback
+  pop: (callback) -> @_db.blpop @_queue_name(), 0, callback
 
   end: -> @_db.end()
 
