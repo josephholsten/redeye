@@ -40,7 +40,7 @@ winston = require 'winston'
 db_index = 4
 
 winston.setLevels winston.config.syslog.levels
-winston.loggers.default.transports[0].level = 'info'
+winston.level = 'info'
 
 # Test class for replacing a single expresso test.
 class RedeyeTest
