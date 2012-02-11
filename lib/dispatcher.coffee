@@ -148,6 +148,7 @@ class Dispatcher
 
   # Recover from a stuck process.
   _recover: ->
+    winston.debug 'Dispatcher: recovering'
     if @doc.recoverable()
       for cycle in @doc.cycles
         return @_fail_recovery() if @_seen_cycle cycle
@@ -165,6 +166,7 @@ class Dispatcher
 
   # Recovery failed, let the callback know about it.
   _fail_recovery: ->
+    winston.error 'Dispatcher: recovery failed'
     @_stuck_callback?(@doc, @_dict.db())
 
   # Tell the given worker that they have cycle dependencies.
