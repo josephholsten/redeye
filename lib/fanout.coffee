@@ -1,3 +1,3 @@
-RedisFanout = require './redis_fanout'
+Redis = require './fanout/redis'
 
-module.exports = RedisFanout
+module.exports = Redis

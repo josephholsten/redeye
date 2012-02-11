@@ -1,7 +1,7 @@
-consts = require './consts'
-db = require './db'
+consts = require '../consts'
+db = require '../db'
 _ = require 'underscore'
-require './util'
+require '../util'
 
 module.exports = class RedisFanout
   constructor: (options) ->
