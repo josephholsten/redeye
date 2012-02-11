@@ -5,6 +5,7 @@ ControlFanout = require './control_fanout'
 RequestFanout = require './request_fanout'
 ResponseFanout = require './response_fanout'
 JobQueue = require './job_queue'
+Dictionary = require './dictionary'
 DependencyCollection = require './dependency_collection'
 _ = require 'underscore'
 require './util'
@@ -26,6 +27,7 @@ class Dispatcher
     @_request_fanout = new RequestFanout {db_index}
     @_response_fanout = new ResponseFanout {db_index}
     @_job_queue = new JobQueue {db_index}
+    @_dict = new Dictionary {db_index}
     @_dependencies = new DependencyCollection()
     @_cycles = {}
 
@@ -43,6 +45,7 @@ class Dispatcher
       @_request_fanout.end()
       @_response_fanout.end()
       @_control_fanout.end()
+      @_dict.end()
       @_job_queue.end()
     setTimeout finish, 500
 
@@ -162,7 +165,7 @@ class Dispatcher
 
   # Recovery failed, let the callback know about it.
   _fail_recovery: ->
-    @_stuck_callback?(@doc, @_control_fanout.db())
+    @_stuck_callback?(@doc, @_dict.db())
 
   # Tell the given worker that they have cycle dependencies.
   _signal_worker_of_cycles: (source, targets) ->
