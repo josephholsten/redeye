@@ -7,7 +7,7 @@ module.exports = class AuditLog
 
   # Write text to the audit stream
   log: (text) ->
-    winston.info "Audit", text
+    winston.debug "Audit", text
     @_stream.write "#{text}\n" if @_stream
 
   request: (source, keys) ->
