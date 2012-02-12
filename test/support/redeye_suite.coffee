@@ -25,17 +25,19 @@
 #           # Be sure to call @finish() when you're done
 # 
 # You can see examples in `redeye/test/*_test.coffee`.
+lib = '../../lib/'
 
-# Dependencies.
-dispatcher = require '../../lib/dispatcher'
-redeye = require '../../lib/redeye'
-consts = require '../../lib/consts'
-RequestQueue = require '../../lib/request_queue'
-AuditListener = require './audit_listener'
-db = require '../../lib/db'
 _ = require 'underscore'
-require '../../lib/util'
 winston = require 'winston'
+
+redeye = require lib + 'redeye'
+consts = require lib + 'consts'
+db = require lib + 'db'
+dispatcher = require lib + 'dispatcher'
+RequestQueue = require lib + 'request_queue'
+require lib + 'util'
+
+AuditListener = require './audit_listener'
 
 db_index = 4
 
