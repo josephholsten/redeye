@@ -1,3 +1,5 @@
-Redis = require './fanout/redis'
+config = require './config'
 
-module.exports = Redis
+module.exports = switch config.fanout
+  when 'redis' then require './fanout/redis'
+  when 'amqp' then require './fanout/amqp'

@@ -1,8 +1,8 @@
 Worker = require './worker'
 Dictionary = require './dictionary'
 ControlFanout = require './control_fanout'
-RequestFanout = require './request_fanout'
-ResponseFanout = require './response_fanout'
+RequestQueue = require './request_queue'
+ResponseQueue = require './response_queue'
 JobQueue = require './job_queue'
 events = require 'events'
 consts = require './consts'
@@ -16,8 +16,8 @@ class WorkQueue extends events.EventEmitter
   constructor: (@options) ->
     {db_index} = @options
     @worker_dict = new Dictionary {db_index}
-    @worker_request_fanout = new RequestFanout {db_index}
-    @worker_response_fanout = new ResponseFanout {db_index}
+    @worker_request_queue = new RequestQueue {db_index}
+    @worker_response_queue = new ResponseQueue {db_index}
     @runners = {}
     @mixins = {}
     @_job_queue = new JobQueue {db_index}
@@ -102,8 +102,8 @@ class WorkQueue extends events.EventEmitter
     @_job_queue.end()
     @_control_fanout.end()
     @worker_dict.end()
-    @worker_request_fanout.end()
-    @worker_response_fanout.end()
+    @worker_request_queue.end()
+    @worker_response_queue.end()
     @callback?()
 
   # Clean out the sticky cache

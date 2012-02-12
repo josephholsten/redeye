@@ -2,8 +2,8 @@ consts = require './consts'
 Doctor = require './doctor'
 AuditLog = require './audit_log'
 ControlFanout = require './control_fanout'
-RequestFanout = require './request_fanout'
-ResponseFanout = require './response_fanout'
+RequestQueue = require './request_queue'
+ResponseQueue = require './response_queue'
 JobQueue = require './job_queue'
 Dictionary = require './dictionary'
 DependencyCollection = require './dependency_collection'
@@ -24,8 +24,8 @@ class Dispatcher
     @_audit_log = new AuditLog stream: options.audit
     {db_index} = options
     @_control_fanout = new ControlFanout {db_index}
-    @_request_fanout = new RequestFanout {db_index}
-    @_response_fanout = new ResponseFanout {db_index}
+    @_request_queue = new RequestQueue {db_index}
+    @_response_queue = new ResponseQueue {db_index}
     @_job_queue = new JobQueue {db_index}
     @_dict = new Dictionary {db_index}
     @_dependencies = new DependencyCollection()
@@ -33,8 +33,8 @@ class Dispatcher
 
   # Subscribe to the `requests` and `responses` channels.
   listen: ->
-    @_request_fanout.listen (source, keys) => @_requested source, keys
-    @_response_fanout.listen (str) => @_responded str
+    @_request_queue.listen (source, keys) => @_requested source, keys
+    @_response_queue.listen (str) => @_responded str
 
   # Send quit signals to the work queues.
   quit: ->
@@ -42,8 +42,8 @@ class Dispatcher
     @_control_fanout.quit()
     finish = =>
       @_job_queue.clear()
-      @_request_fanout.end()
-      @_response_fanout.end()
+      @_request_queue.end()
+      @_response_queue.end()
       @_control_fanout.end()
       @_dict.end()
       @_job_queue.end()

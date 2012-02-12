@@ -1,3 +1,5 @@
-Redis = require './queue/redis'
+config = require './config'
 
-module.exports = Redis
+module.exports = switch config.queue
+  when 'redis' then require './queue/redis'
+  when 'amqp' then require './queue/amqp'

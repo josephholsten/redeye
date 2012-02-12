@@ -1,3 +1,4 @@
-Redis = require './dictionary/redis'
+config = require './config'
 
-module.exports = Redis
+module.exports = switch config.dictionary
+  when 'redis' then require './dictionary/redis'

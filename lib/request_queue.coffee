@@ -1,11 +1,8 @@
-Fanout = require './fanout'
+AsyncQueue = require './async_queue'
 consts = require './consts'
-db = require './db'
-_ = require 'underscore'
-require './util'
 
-module.exports = class RequestFanout extends Fanout
-  _fanout_name: -> 'requests'
+module.exports = class RequestQueue extends AsyncQueue
+  _queue_name: -> 'requests'
 
   listen: (callback) ->
     super (str) ->

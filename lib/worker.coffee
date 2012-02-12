@@ -19,8 +19,8 @@ class Worker
     @args = args # weird bug in coffeescript: wanted @args... in line above
     @dict = @queue.worker_dict
     @db = @dict.db()
-    @_request_fanout = @queue.worker_request_fanout
-    @_response_fanout = @queue.worker_response_fanout
+    @_request_queue = @queue.worker_request_queue
+    @_response_queue = @queue.worker_response_queue
     @cache = {}
     @saved_keys = {}
     @cycle = {}
@@ -128,7 +128,7 @@ class Worker
     @emitted_key[key] = true
     json = value?.toJSON?() ? value
     @dict.set key, JSON.stringify(json)
-    @_response_fanout.publish key
+    @_response_queue.publish key
 
   # If we've seen this `@for_reals` before, then blow right past it.
   # Otherwise, abort the runner function and start over (after checking
@@ -242,7 +242,7 @@ class Worker
   # on a resume key. Once we get that response, try again to fetch the
   # dependencies (which should all be present).
   request_missing: (keys) ->
-    @_request_fanout.request_missing @key, keys
+    @_request_queue.request_missing @key, keys
 
   # The dispatcher said to resume, so go look for the missing values again. If
   # we're resuming from a cycle failure, go grab the key.

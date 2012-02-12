@@ -30,7 +30,7 @@
 dispatcher = require '../../lib/dispatcher'
 redeye = require '../../lib/redeye'
 consts = require '../../lib/consts'
-RequestFanout = require '../../lib/request_fanout'
+RequestQueue = require '../../lib/request_queue'
 AuditListener = require './audit_listener'
 db = require '../../lib/db'
 _ = require 'underscore'
@@ -41,6 +41,7 @@ db_index = 4
 
 winston.setLevels winston.config.syslog.levels
 winston.level = 'info'
+# winston.level = 'debug'
 
 # Test class for replacing a single expresso test.
 class RedeyeTest
@@ -52,7 +53,7 @@ class RedeyeTest
     @db_index = ++db_index
     @db = db @db_index
     @audit = new AuditListener
-    @_request_fanout = new RequestFanout db_index: @db_index
+    @_request_queue = new RequestQueue db_index: @db_index
     @opts = test_mode: true, db_index: @db_index, audit: @audit
     @queue = redeye.queue @opts
     @add_workers()
@@ -82,19 +83,19 @@ class RedeyeTest
   # Forcefully quit the test
   die: ->
     @dispatcher.quit()
-    @assert.ok false, "Timed out, sad panda"
     @finish()
+    @assert.ok false, "Timed out, sad panda"
 
   # Terminate the last redis connection, ending the test
   finish: ->
     clearTimeout @timeout
     @db.end()
-    @_request_fanout.end()
+    @_request_queue.end()
   
   # Send a request to the correct `requests` channel
   request: (args...) ->
     @requested = args.join consts.arg_sep
-    @_request_fanout.publish @requested
+    @_request_queue.publish @requested
   
   # Set a redis value, but first convert to JSON
   set: (args..., value) ->
