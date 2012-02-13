@@ -10,7 +10,9 @@ module.exports = class Redis
     @_db
 
   get: (key, callback) ->
-    @_db.get key, callback
+    @_db.get key, (err, str) ->
+      throw err if err
+      callback JSON.parse(str)
 
   mget: (keys, callback) ->
     @_db.mget keys, callback

@@ -107,9 +107,7 @@ class RedeyeTest
   # Look up and de-jsonify a value from redis
   get: (args..., callback) ->
     key = args.join consts.arg_sep
-    @dict.get key, (err, str) ->
-      throw err if err
-      callback JSON.parse(str)
+    @dict.get key, callback
 
 # This file exports a method which replaces
 # a whole set of tests. See the comment at the
