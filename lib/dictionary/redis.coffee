@@ -1,4 +1,5 @@
 db = require '../db'
+consts = require '../consts'
 winston = require 'winston'
 
 module.exports = class Redis
@@ -9,7 +10,8 @@ module.exports = class Redis
   db: ->
     @_db
 
-  get: (key, callback) ->
+  get: (args..., callback) ->
+    key = args.join consts.arg_sep
     @_db.get key, (err, str) ->
       throw err if err
       callback JSON.parse(str)
@@ -23,7 +25,8 @@ module.exports = class Redis
   keys: (pattern, callback) ->
     @_db.keys pattern, callback
 
-  set: (key, value) ->
+  set: (args..., value) ->
+    key = args.join consts.arg_sep
     json = value?.toJSON?() ? value
     @_db.set key, JSON.stringify(json)
 

@@ -101,13 +101,11 @@ class RedeyeTest
   
   # Set a redis value, but first convert to JSON
   set: (args..., value) ->
-    key = args.join consts.arg_sep
-    @dict.set key, value
+    @dict.set.apply @dict, [args..., value]
 
   # Look up and de-jsonify a value from redis
   get: (args..., callback) ->
-    key = args.join consts.arg_sep
-    @dict.get key, callback
+    @dict.get.apply @dict, [args..., callback]
 
 # This file exports a method which replaces
 # a whole set of tests. See the comment at the
