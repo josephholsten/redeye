@@ -126,8 +126,7 @@ class Worker
     key = args.join consts.arg_sep
     return if @emitted_key[key]
     @emitted_key[key] = true
-    json = value?.toJSON?() ? value
-    @dict.set key, JSON.stringify(json)
+    @dict.set key, value
     @_response_queue.publish key
 
   # If we've seen this `@for_reals` before, then blow right past it.

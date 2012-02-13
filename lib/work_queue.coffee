@@ -55,6 +55,19 @@ class WorkQueue extends events.EventEmitter
     Worker.clear_callback = callback
     this
 
+  request: (args...) ->
+    @worker_request_queue.publish args.join consts.arg_sep
+
+  # Clear all associated work queues
+  clear: ->
+
+  end: ->
+    # @_job_queue.end()
+    # @_control_fanout.end()
+    # @worker_dict.end()
+    # @worker_request_queue.end()
+    # @worker_response_queue.end()
+
   # Subscribe to channels
   _listen: ->
     @_control_fanout.listen (msg) => @_perform msg
@@ -115,7 +128,6 @@ class WorkQueue extends events.EventEmitter
   _error: (err) ->
     message = err.stack ? err
     winston.error message
-    @_job_queue.fatal message
     @worker_dict.set 'fatal', message
 
   # Print a debugging statement

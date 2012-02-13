@@ -1,24 +1,32 @@
 db = require '../db'
+winston = require 'winston'
 
 module.exports = class Redis
   constructor: (options) ->
-    {db_index} = options
-    @_db = db db_index
-
-  end: ->
-    @_db.end()
+    @db_index = options.db_index
+    @_db = db @db_index
 
   db: ->
     @_db
 
-  get: (key) ->
-    @_db.get key
+  get: (key, callback) ->
+    @_db.get key, callback
 
   mget: (keys, callback) ->
     @_db.mget keys, callback
+
+  mset: (keys...) ->
+    @_db.mset.apply @_db, keys
 
   keys: (pattern, callback) ->
     @_db.keys pattern, callback
 
   set: (key, value) ->
-    @_db.set key, value
+    json = value?.toJSON?() ? value
+    @_db.set key, JSON.stringify(json)
+
+  clear: (callback) ->
+    @_db.flushdb callback
+
+  end: ->
+    @_db.end()

@@ -16,12 +16,12 @@
 #             # same as calling `worker worker_name, (args...) ->`
 #         
 #         setup:
-#           # Use @db to access Redis
+#           # Use @dict to access Redis
 #           # Use @request(key) to kick off the redeye tasks
 #           # Access @dispatcher to add custom event handling
 #         
 #         expect:
-#           # Use @db and @assert to test your workers
+#           # Use @dict and @assert to test your workers
 #           # Be sure to call @finish() when you're done
 # 
 # You can see examples in `redeye/test/*_test.coffee`.
@@ -34,8 +34,8 @@ redeye = require lib + 'redeye'
 consts = require lib + 'consts'
 db = require lib + 'db'
 dispatcher = require lib + 'dispatcher'
-RequestQueue = require lib + 'request_queue'
 require lib + 'util'
+Dict = require lib + 'dictionary'
 
 AuditListener = require './audit_listener'
 
@@ -52,12 +52,12 @@ class RedeyeTest
   # instance can be used to execute the altered test.
   constructor: (test, @exit, @assert) ->
     {setup: @setup, expect: @expect, workers: @workers} = test
-    @db_index = ++db_index
-    @db = db @db_index
+    current_db_index = ++db_index
     @audit = new AuditListener
-    @_request_queue = new RequestQueue db_index: @db_index
-    @opts = test_mode: true, db_index: @db_index, audit: @audit
+    @opts = test_mode: true, db_index: current_db_index, audit: @audit
     @queue = redeye.queue @opts
+    @dict = new Dict @opts
+    @db = @dict.db()
     @add_workers()
   
   # Add the workers defined by the `workers` key of the test to
@@ -76,7 +76,7 @@ class RedeyeTest
   #  - Has an emergency timeout that kills the redeye processes
   #  - Waits on `@finish` to be called to complete the test
   run: ->
-    @db.flushdb =>
+    @dict.clear =>
       @dispatcher = dispatcher.run @opts
       @queue.run => @expect.apply this
       setTimeout (=> @setup.apply this), 100
@@ -84,30 +84,30 @@ class RedeyeTest
 
   # Forcefully quit the test
   die: ->
-    @dispatcher.quit()
     @finish()
     @assert.ok false, "Timed out, sad panda"
 
   # Terminate the last redis connection, ending the test
   finish: ->
+    @dispatcher.quit()
     clearTimeout @timeout
-    @db.end()
-    @_request_queue.end()
+    @dict.clear()
+    @dict.end()
+    @queue.end()
   
   # Send a request to the correct `requests` channel
   request: (args...) ->
-    @requested = args.join consts.arg_sep
-    @_request_queue.publish @requested
+    @queue.request.apply @queue, args
   
   # Set a redis value, but first convert to JSON
   set: (args..., value) ->
     key = args.join consts.arg_sep
-    @db.set key, JSON.stringify(value)
+    @dict.set key, value
 
   # Look up and de-jsonify a value from redis
   get: (args..., callback) ->
     key = args.join consts.arg_sep
-    @db.get key, (err, str) ->
+    @dict.get key, (err, str) ->
       throw err if err
       callback JSON.parse(str)
 
